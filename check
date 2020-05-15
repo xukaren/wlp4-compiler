@@ -1,0 +1,7 @@
+clear;
+source /u/cs241/setup;
+
+cat foo.wlp4 | wlp4c > out.mips
+mips.twoints out.mips
+
+

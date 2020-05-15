@@ -1,0 +1,233 @@
+#include <iostream>
+#include <string>
+#include <vector>
+#include <map>
+#include <sstream>
+#include <memory>
+
+// Rules
+const vector<string> terminals = {"BOF", "BECOMES", "COMMA", "ELSE", "EOF", "EQ", "GE", "GT", "ID", "IF", "INT", "LBRACE", "LE", "LPAREN", "LT", "MINUS", "NE", "NUM", "PCT", "PLUS", "PRINTLN", "RBRACE", "RETURN", "RPAREN", "SEMI", "SLASH", "STAR", "WAIN", "WHILE", "AMP", "LBRACK", "RBRACK", "NEW", "DELETE", "NULL"};
+
+
+// Print error messages and throw  
+void printExitErrMsg(string msg = ""){
+  cerr << "ERROR: " << msg << endl;
+  throw 100;    // chose error # to be 100 f
+}
+
+// Prints the symbol table 
+void printSymTable (){
+    for(ProcedureTable::iterator it = symbolTable.begin(); it != symbolTable.end(); it++){
+        
+        // print procedure name 
+        string proc = it->first; 
+        cerr << proc; 
+
+        // print signature (if exist) 
+        for (int i = 0; i < it->second.first.size(); i++){
+            cerr << " " << it->second.first.at(i);
+        }
+        cerr << endl; 
+
+        // print variables (if exist)
+        for (VariableTable::iterator it2 = it->second.second.begin(); it2 != it->second.second.end(); it2++){
+            cerr << it2->first << " "  << it2->second.first << " " <<  it2->second.second << endl;
+        }
+
+        cerr << endl; 
+    }
+}
+
+// Parse Tree structure 
+struct Node{
+    string rule; 
+    vector<string> tokens;
+    vector<shared_ptr<Node>> children;  
+    string type=""; 
+    
+    string getType(){ 
+
+        if (this->type != ""){
+            return this->type; 
+        }
+
+        string lhs = this->tokens.at(0); 
+
+        // terminals 
+        if (lhs == "ID"){
+            string rhs = this->tokens.at(1);
+            this->type = symbolTable[currProc].second[rhs].first;
+            
+        } else if (lhs == "NUM"){
+            this->type = "int"; 
+
+        } else if (lhs == "NULL" ){
+            this->type = "int*"; 
+
+        } else if (this->rule == "dcl type ID" ){
+            this->type = this->children.at(0)->getType();
+
+        } else if (this->rule == "type INT" ){
+            this->type = "int";
+
+        } else if (this->rule == "type INT STAR" ){
+            this->type = "int*";
+
+        } else if (this->rule == "factor ID" || this->rule == "factor NUM" || this->rule == "factor NULL" || this->rule == "lvalue ID") { 
+            this->type = this->children.at(0)->getType();
+
+        } else if (this->rule == "factor LPAREN expr RPAREN" || this->rule == "lvalue LPAREN expr RPAREN") { 
+            this->type = this->children.at(1)->getType();
+
+        } else if (this->rule == "factor AMP lvalue") { 
+            if(this->children.at(1)->getType() != "int") {
+                printExitErrMsg("operator & expects int operand"); 
+            }
+            this->type = "int*";
+
+        } else if (this->rule == "factor STAR factor" || this->rule == "lvalue STAR factor") { 
+
+            if(this->children.at(1)->getType() != "int*") {
+                printExitErrMsg("cannot dereference int, only int* allowed"); 
+            }
+            this->type = "int";
+
+        } else if (this->rule == "factor NEW INT LBRACK expr RBRACK") { 
+            if(this->children.at(3)->getType() != "int") {
+                printExitErrMsg("operator & expects int operand"); 
+            }
+            this->type = "int*";
+
+        } else if (this->rule == "factor ID LPAREN RPAREN") { 
+            
+            string proc_name = this->children.at(0)->tokens.at(1); 
+
+            if (symbolTable[proc_name].first.size() > 0){
+                printExitErrMsg("expects no signature for " +(this->children.at(0)->tokens.at(1))); 
+            }
+            this->type = "int";
+
+        } else if (this->rule == "factor ID LPAREN arglist RPAREN"){
+
+            sigCountProc = this->children.at(0)->tokens.at(1); 
+            sigLength = 0; 
+            this->type = this->children.at(2)->getType(); 
+
+        } else if(this->rule =="arglist expr COMMA arglist"){
+            sigLength++; 
+
+            int correctLength = symbolTable[sigCountProc].first.size(); 
+            if(sigLength > correctLength) {
+                printExitErrMsg("too many params for " +sigCountProc); 
+            } else {
+                // check if type of expr and the one in symbolTable matches
+                if (this->children.at(0)->getType() != symbolTable[sigCountProc].first.at(sigLength-1)){
+                    printExitErrMsg("incorrect type for param " +this->children.at(0)->children.at(0)->children.at(0)->children.at(0)->rule+ " vs " + symbolTable[sigCountProc].first.at(sigLength)+ " in signature of " +sigCountProc); 
+                }
+                // keep recursing 
+                this->type = this->children.at(2)->getType();     
+            }
+            
+        } else if(this->rule =="arglist expr"){
+            sigLength++; 
+
+            int correctLength = symbolTable[sigCountProc].first.size(); 
+
+            if(sigLength != correctLength) {
+                printExitErrMsg("incorrect # of params for " +sigCountProc); 
+            } else {
+                // check if type of expr and the one in symbolTable matches
+                if (this->children.at(0)->getType() != symbolTable[sigCountProc].first.at(sigLength-1)){
+                    printExitErrMsg("incorrect type for param " +this->children.at(0)->getType()+ " in signature of " +sigCountProc); 
+                }
+            }
+            //base case for procedure call with params
+            this->type = "int";
+            
+        } else if (this->rule == "term factor" ){
+            this->type = this->children.at(0)->getType(); 
+
+         // all other cases of prod rules with term on the lhs
+        } else if (lhs == "term"){
+             if(this->children.at(0)->getType() != "int" || this->children.at(2)->getType() != "int") {
+                printExitErrMsg("term and factor must be type int"); 
+            }
+            this->type = "int"; 
+
+        } else if (this->rule == "expr term" ){
+            this->type = this->children.at(0)->getType(); 
+
+        } else if (this->rule == "expr expr PLUS term"){
+            if(this->children.at(0)->getType() == "int" && this->children.at(2)->getType() == "int") {
+                this->type = "int"; 
+            } else if (this->children.at(0)->getType() == "int*" && this->children.at(2)->getType() == "int") {
+                this->type = "int*"; 
+            } else if (this->children.at(0)->getType() == "int" && this->children.at(2)->getType() == "int*") {
+                this->type = "int*"; 
+            } else{
+                printExitErrMsg("rhs of 'expr -> expr PLUS term' have wrong types"); 
+            }
+        
+        } else if (this->rule == "expr expr MINUS term" ){
+            if(this->children.at(0)->getType() == "int" && this->children.at(2)->getType() == "int") {
+                this->type = "int"; 
+            } else if (this->children.at(0)->getType() == "int*" && this->children.at(2)->getType() == "int") {
+                this->type = "int*"; 
+            } else if (this->children.at(0)->getType() == "int*" && this->children.at(2)->getType() == "int*") {
+                this->type = "int"; 
+            } else{
+                printExitErrMsg("rhs of 'expr -> expr MINUS term' have wrong types"); 
+            }
+        
+        } else if (this->rule == "main INT WAIN LPAREN dcl COMMA dcl RPAREN LBRACE dcls statements RETURN expr SEMI RBRACE"){
+            
+            if(this->children.at(5)->getType() != "int"){
+                printExitErrMsg("second param of wain must be int"); 
+            }
+            if(this->children.at(11)->getType() != "int"){
+                printExitErrMsg("expr from wain must be int"); 
+            }  
+
+        } else if (this->rule == "procedure INT ID LPAREN params RPAREN LBRACE dcls statements RETURN expr SEMI RBRACE"){
+            
+            if(this->children.at(9)->getType() != "int"){    
+                printExitErrMsg("procedure expr must be int"); 
+            } 
+
+        } 
+        // statement / test rules
+        else if (this->rule == "statement lvalue BECOMES expr SEMI"){
+            if(this->children.at(0)->getType() != this->children.at(2)->getType()){
+                printExitErrMsg( this->children.at(0)->getType() + " = "  +this->children.at(2)->getType() +" invalid. needs same type"); 
+            } 
+
+        } else if (this->rule == "statement PRINTLN LPAREN expr RPAREN SEMI"){
+            if(this->children.at(2)->getType() != "int"){
+                printExitErrMsg("println needs type int"); 
+            } 
+
+        } else if (this->rule == "statement DELETE LBRACK RBRACK expr SEMI"){
+            if(this->children.at(3)->getType() != "int*"){
+                printExitErrMsg("delete[] needs type int*"); 
+            } 
+
+        } else if (lhs == "test"){
+            if(this->children.at(0)->getType() != this->children.at(2)->getType()){
+                printExitErrMsg("test needs 2 same types"); 
+            } 
+
+        } else if (this->rule == "dcls dcls dcl BECOMES NUM SEMI"){
+            if(this->children.at(1)->getType() != "int"){
+                printExitErrMsg("dcls -> dcls dcl BECOMES NUM SEMI needs int"); 
+            } 
+
+        } else if (this->rule == "dcls dcls dcl BECOMES NULL SEMI"){
+            if(this->children.at(1)->getType() != "int*"){
+                printExitErrMsg("dcls -> dcls dcl BECOMES NULL SEMI needs int*"); 
+            } 
+        } else {
+            this->type = "none"; 
+        }
+        return this->type;
+    }
+};

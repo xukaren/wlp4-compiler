@@ -1,0 +1,66 @@
+int abc(int *ab, int a, int d) {
+  int sum = 5848;
+  println(0-1);
+  println(sum); 
+  return 10;
+  //return 62 * *ab / 39 * (0-45) + 4438 * *&*&sum;
+}
+
+int foo(int *a) {
+  int * local = NULL;
+  local = a; 
+  return 62 + *local * *a;
+}
+
+int bar() {
+  //int *local = new int[1];
+  //*local = 30; 
+  //println(*local);
+  //return local - foo();
+  return 5;
+}
+
+int wain(int *a, int b){ 
+  int local = 5;
+  int * ab = NULL; 
+  int * arr = NULL; 
+  int c = 0;
+  int * i = NULL;
+
+  i = &c; 
+  arr = new int[5];
+  ab = new int[23];
+  ab = &b; 
+
+  println(abc(a, b, b)); 
+  
+  if(7 + 3 != 10){
+    if (local * bar() + 3 == 4){
+      while (local > 0){
+        local = local-1; 
+      }
+    } else {
+
+    }
+  } else{
+      
+
+      while( *i < 5){
+        *(arr+*i) = 0+foo(&local)* *i; 
+
+        //println(*(arr+*i));
+        *i = *i+1;
+
+        //println(&a);
+      }
+      
+  }
+  //delete [] arr;
+  
+  //delete [] ab; 
+
+  //println(*ab);
+  //println(*arr);
+  return *(arr + *i - 1);
+}
+

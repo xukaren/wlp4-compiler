@@ -1,0 +1,8 @@
+clear;
+make;
+source /u/cs241/setup;
+cat foo.wlp4 | wlp4scan | wlp4parse | ./wlp4gen > source.asm;
+cs241.linkasm < source.asm > source.merl 
+cs241.linker source.merl print.merl alloc.merl > exec.mips
+
+mips.twoints exec.mips
